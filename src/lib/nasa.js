@@ -56,10 +56,23 @@ export async function fetchAPOD(dateStr) {
     return { data: parsed, fromCache: true }
   }
   const url = `${NASA_BASE}/planetary/apod?api_key=${NASA_KEY}&date=${dateStr}`
-  const res = await fetch(url)
-  if (!res.ok) {
-    const text = await res.text().catch(() => '')
-    throw new Error(`NASA APOD request failed (${res.status}). ${text.slice(0, 120)}`)
+  let res
+  try {
+    res = await fetch(url)
+  } catch (e) {
+    res = null
+  }
+  if (!res || !res.ok) {
+    // NASA API is down or rate limited (429 is common on the demo key).
+    // Do not fail the page, use the real APOD from the website instead.
+    const real = await fetchRealAPOD(dateStr)
+    if (real) {
+      localStorage.setItem(cacheKey, JSON.stringify(real))
+      return { data: real, fromCache: false }
+    }
+    const fallback = fallbackForDate(dateStr)
+    localStorage.setItem(cacheKey, JSON.stringify(fallback))
+    return { data: fallback, fromCache: false }
   }
   const data = await res.json()
   if (data.code || data.error) {
