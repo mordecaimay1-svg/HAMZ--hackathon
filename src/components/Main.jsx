@@ -3,6 +3,8 @@ import React, { useEffect, useState } from 'react'
 const Main = (props) => {
   const { data } = props
   const [imgLoaded, setImgLoaded] = useState(false)
+  const [imgFailed, setImgFailed] = useState(false)
+  const [imgSrc, setImgSrc] = useState('')
   const isVideo = data?.media_type === 'video'
   const videoUrl = data?.url
   const imageUrl = data?.hdurl || data?.url
@@ -21,7 +23,17 @@ const Main = (props) => {
 
   useEffect(() => {
     setImgLoaded(false)
+    setImgFailed(false)
+    setImgSrc(imageUrl)
   }, [imageUrl])
+
+  function handleImgError() {
+    if (data?.altUrl && imgSrc !== data.altUrl) {
+      setImgSrc(data.altUrl)
+      return
+    }
+    setImgFailed(true)
+  }
 
   if (isLogoOnly && !isVideo) {
     return (
@@ -42,7 +54,13 @@ const Main = (props) => {
   return (
     <div className="imgContainer">
       <span className="mediaTypeBadge">{isVideo ? 'VIDEO' : 'IMAGE'}</span>
-      {!imgLoaded && !isVideo && <div className="mediaSkeleton"><span className="skeletonStar">✦</span><p>Loading image...</p></div>}
+      {!imgLoaded && !isVideo && !imgFailed && <div className="mediaSkeleton"><span className="skeletonStar">✦</span><p>Loading image...</p></div>}
+      {imgFailed && !isVideo && (
+        <div className="mediaSkeleton">
+          <span className="skeletonStar">✦</span>
+          <p>That image would not load from NASA right now. The title and story above are still from NASA, try another date.</p>
+        </div>
+      )}
       {isVideo ? (
         isEmbeddableVideo ? (
           <iframe
@@ -61,12 +79,13 @@ const Main = (props) => {
             preload="metadata"
           />
         )
-      ) : (
+      ) : imgFailed ? null : (
         <img
-          src={imageUrl}
+          src={imgSrc || imageUrl}
           alt={data?.title || 'bg-img'}
           className={`bgImage ${imgLoaded ? 'imgLoaded' : 'imgLoading'}`}
           onLoad={() => setImgLoaded(true)}
+          onError={handleImgError}
         />
       )}
     </div>
