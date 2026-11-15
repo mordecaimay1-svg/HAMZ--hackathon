@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import SideBar from './components/SideBar'
 import Main from './components/Main'
 import Footer from './components/Footer'
+import Starfield from './components/Starfield'
 import { fetchAPOD, fetchNEOToday, formatKm, randomAPODDate, todayISO } from './lib/nasa'
 import { explainWithGemini, localExplainer } from './lib/gemini'
 import { speakWithBrowser, speakWithElevenLabs, stopBrowserSpeech } from './lib/elevenlabs'
@@ -189,9 +190,10 @@ const App = () => {
 
   return (
     <div className="appShell">
+      <Starfield />
       <header className="appHeader">
         <div>
-          <h1>Nest APOD Explorer</h1>
+          <h1><span className="titleStar">✦</span> Nest APOD Explorer</h1>
           <p>Today in space, explained in plain English and read aloud.</p>
         </div>
         <div className="badgeRow" aria-label="Hackathon tracks">
@@ -222,9 +224,19 @@ const App = () => {
         </section>
 
         {loading && (
-          <div className="loadingState" role="status">
-            <i className="fa-solid fa-gear"></i>
-            <p>Loading the sky for {selectedDate}...</p>
+          <div className="loadingSky" role="status">
+            <div className="loadingOrbit">
+              <span className="loadingPlanet">🌍</span>
+              <span className="loadingMoon">🌙</span>
+            </div>
+            <p className="loadingTitle">Loading the sky for {selectedDate}...</p>
+            <p className="loadingSub">Fetching the picture, the story, and today's asteroids from NASA.</p>
+            <div className="loadingBar"><span /></div>
+            <div className="skeletonGrid">
+              <div className="skeletonHero" />
+              <div className="skeletonLine" />
+              <div className="skeletonLine skeletonShort" />
+            </div>
           </div>
         )}
 
