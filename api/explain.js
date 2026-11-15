@@ -38,10 +38,11 @@ export default async function handler(req, res) {
         .filter((m) => (m.supportedGenerationMethods || []).includes('generateContent'))
         .map((m) => String(m.name || '').replace('models/', ''))
         .filter(Boolean)
-      const preferred = ['gemini-2.0-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash-lite']
+      const preferred = ['gemini-2.0-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash-lite', 'gemini-flash-latest']
       const ordered = preferred.filter((p) => usable.includes(p))
-      const rest = usable.filter((u) => !preferred.includes(u))
-      if (ordered.length || rest.length) models = [...ordered, ...rest]
+      // Only use exact preferred text models. Other listed models are often
+      // image, audio, or live models that do not support plain TEXT output.
+      if (ordered.length) models = ordered
     }
   } catch (e) {}
   let r = null
@@ -64,7 +65,7 @@ export default async function handler(req, res) {
       if (!lastError.includes('no longer available') && !lastError.includes('not found')) break
     }
     if (!r || !r.ok) {
-      res.status(502).json({ error: `Gemini request failed (${r ? r.status : 'no response'}). ${String(lastError).slice(0, 140)}` })
+      res.status(502).json({ error: `Gemini request failed (${r ? r.status : 'no response'}). Tried: ${models.join(', ')}. ${String(lastError).slice(0, 400)}` })
       return
     }
     const json = await r.json()
