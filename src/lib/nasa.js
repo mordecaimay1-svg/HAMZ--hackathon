@@ -1,8 +1,10 @@
 // NASA API helpers. No keys are stored here. The NASA key comes from
 // VITE_NASA_API_KEY at build time and defaults to DEMO_KEY.
 import { fallbackForDate, isPlaceholderAPOD } from './fallback'
+import { archiveForDate, ARCHIVE_DATES } from './apodArchive'
 const NASA_KEY = import.meta.env.VITE_NASA_API_KEY || 'DEMO_KEY'
 const NASA_BASE = 'https://api.nasa.gov'
+export const NEWEST_REAL_APOD_DATE = '2026-07-15'
 
 export function todayISO() {
   const d = new Date()
@@ -11,11 +13,23 @@ export function todayISO() {
 }
 
 export function randomAPODDate() {
-  const start = new Date('1995-06-16T00:00:00').getTime()
-  const end = Date.now()
-  const pick = new Date(start + Math.random() * (end - start))
-  const off = pick.getTimezoneOffset()
-  return new Date(pick.getTime() - off * 60000).toISOString().slice(0, 10)
+  // Surprise me picks only from verified real APOD dates, so it always
+  // shows a real photo even while the APOD API returns placeholders.
+  return ARCHIVE_DATES[Math.floor(Math.random() * ARCHIVE_DATES.length)]
+}
+
+async function fetchRealAPOD(dateStr) {
+  const archived = archiveForDate(dateStr)
+  if (archived) return archived
+  try {
+    const r = await fetch(`/api/apod?date=${dateStr}`)
+    if (!r.ok) return null
+    const d = await r.json()
+    if (d && d.title && d.url && !isPlaceholderAPOD(d)) return d
+    return null
+  } catch (e) {
+    return null
+  }
 }
 
 export async function fetchAPOD(dateStr) {
@@ -24,6 +38,11 @@ export async function fetchAPOD(dateStr) {
   if (cached) {
     const parsed = JSON.parse(cached)
     if (isPlaceholderAPOD(parsed)) {
+      const real = await fetchRealAPOD(dateStr)
+      if (real) {
+        localStorage.setItem(cacheKey, JSON.stringify(real))
+        return { data: real, fromCache: false }
+      }
       const fallback = fallbackForDate(dateStr)
       localStorage.setItem(cacheKey, JSON.stringify(fallback))
       return { data: fallback, fromCache: true }
@@ -47,6 +66,11 @@ export async function fetchAPOD(dateStr) {
     throw new Error(data.msg || data.error?.message || 'NASA APOD returned an error.')
   }
   if (isPlaceholderAPOD(data)) {
+    const real = await fetchRealAPOD(dateStr)
+    if (real) {
+      localStorage.setItem(cacheKey, JSON.stringify(real))
+      return { data: real, fromCache: false }
+    }
     const fallback = fallbackForDate(dateStr)
     localStorage.setItem(cacheKey, JSON.stringify(fallback))
     return { data: fallback, fromCache: false }

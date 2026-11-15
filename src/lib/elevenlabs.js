@@ -1,6 +1,7 @@
 // ElevenLabs TTS helper, plus a browser speech fallback so the demo
-// always works. The API key is entered in the UI and kept only in
-// localStorage. It is never committed and never sent anywhere except ElevenLabs.
+// always works. First try the built-in server route (/api/listen), which
+// uses a key set once in Vercel, so no visitor has to enter a key.
+// Fall back to a key entered in the UI, then to browser voice.
 const DEFAULT_VOICE_ID = '21m00Tcm4TlvDq8ikWAM'
 
 export function speakWithBrowser(text) {
@@ -16,6 +17,20 @@ export function speakWithBrowser(text) {
 
 export function stopBrowserSpeech() {
   if ('speechSynthesis' in window) window.speechSynthesis.cancel()
+}
+
+export async function speakViaServer(text, voiceId = DEFAULT_VOICE_ID) {
+  const res = await fetch('/api/listen', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: text.slice(0, 4000), voiceId }),
+  })
+  if (!res.ok) {
+    const j = await res.json().catch(() => ({}))
+    throw new Error(j.error || `Listen server returned ${res.status}.`)
+  }
+  const blob = await res.blob()
+  return URL.createObjectURL(blob)
 }
 
 export async function speakWithElevenLabs(apiKey, text, voiceId = DEFAULT_VOICE_ID) {

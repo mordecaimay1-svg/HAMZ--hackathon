@@ -1,5 +1,6 @@
-// Gemini explain helper. The API key is entered in the UI and kept only in
-// localStorage. It is never committed and never sent anywhere except Google.
+// Gemini explain helper. First try the built-in server route (/api/explain),
+// which uses a key set once in Vercel, so no visitor has to enter a key.
+// Fall back to a key entered in the UI, then to the local explainer.
 const GEMINI_URL =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
 
@@ -32,6 +33,28 @@ function extractJson(text) {
     return JSON.parse(raw.slice(start, end + 1))
   } catch {
     return null
+  }
+}
+
+export async function explainViaServer({ title, explanation, dateStr }) {
+  const res = await fetch('/api/explain', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, explanation, dateStr }),
+  })
+  if (!res.ok) {
+    const j = await res.json().catch(() => ({}))
+    throw new Error(j.error || `Explain server returned ${res.status}.`)
+  }
+  const parsed = await res.json()
+  if (!parsed.explainer) throw new Error('Explain server returned no explainer.')
+  return {
+    explainer: String(parsed.explainer).trim(),
+    michigan: parsed.michigan ? String(parsed.michigan).trim() : FALLBACK_MICHIGAN,
+    quiz: Array.isArray(parsed.quiz) && parsed.quiz.length
+      ? parsed.quiz.slice(0, 3).map(String)
+      : localExplainer(title, explanation, dateStr).quiz,
+    source: 'gemini',
   }
 }
 

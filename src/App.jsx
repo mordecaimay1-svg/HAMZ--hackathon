@@ -3,9 +3,9 @@ import SideBar from './components/SideBar'
 import Main from './components/Main'
 import Footer from './components/Footer'
 import Starfield from './components/Starfield'
-import { fetchAPOD, fetchNEOToday, formatKm, randomAPODDate, todayISO } from './lib/nasa'
-import { explainWithGemini, localExplainer } from './lib/gemini'
-import { speakWithBrowser, speakWithElevenLabs, stopBrowserSpeech } from './lib/elevenlabs'
+import { fetchAPOD, fetchNEOToday, formatKm, randomAPODDate, todayISO, NEWEST_REAL_APOD_DATE } from './lib/nasa'
+import { explainWithGemini, explainViaServer, localExplainer } from './lib/gemini'
+import { speakWithBrowser, speakWithElevenLabs, speakViaServer, stopBrowserSpeech } from './lib/elevenlabs'
 
 const GEMINI_KEY_STORE = 'nest-gemini-key'
 const ELEVEN_KEY_STORE = 'nest-elevenlabs-key'
@@ -125,14 +125,21 @@ const App = () => {
     setGeminiLoading(true)
     setGeminiError('')
     try {
-      if (geminiKey) {
-        const result = await explainWithGemini(geminiKey, {
+      try {
+        const result = await explainViaServer({
           title: data.title, explanation: data.explanation, dateStr: data.date,
         })
         setGeminiResult(result)
-      } else {
-        setGeminiResult(localExplainer(data.title, data.explanation, data.date))
-        setGeminiError('No Gemini key added yet, so this is a local plain English version. Add a free Gemini key below for the AI version.')
+      } catch (serverErr) {
+        if (geminiKey) {
+          const result = await explainWithGemini(geminiKey, {
+            title: data.title, explanation: data.explanation, dateStr: data.date,
+          })
+          setGeminiResult(result)
+        } else {
+          setGeminiResult(localExplainer(data.title, data.explanation, data.date))
+          setGeminiError('AI explain is not set up on the server yet, so this is a local plain English version. It still works with no key to enter.')
+        }
       }
     } catch (err) {
       setGeminiResult(localExplainer(data.title, data.explanation, data.date))
@@ -155,38 +162,39 @@ const App = () => {
     if (!text) return
     setAudioError('')
     stopAudio()
-    if (elevenKey) {
-      setAudioMode('loading')
-      try {
-        const url = await speakWithElevenLabs(elevenKey, text)
-        if (audioUrl) URL.revokeObjectURL(audioUrl)
-        setAudioUrl(url)
-        setAudioMode('elevenlabs')
-      } catch (err) {
-        setAudioError(`ElevenLabs call failed, using browser voice instead. ${err.message}`)
+    setAudioMode('loading')
+    try {
+      const url = await speakViaServer(text)
+      if (audioUrl) URL.revokeObjectURL(audioUrl)
+      setAudioUrl(url)
+      setAudioMode('elevenlabs')
+      return
+    } catch (serverErr) {
+      if (elevenKey) {
         try {
-          speakWithBrowser(text)
-          setAudioMode('browser')
-        } catch (e) {
-          setAudioError(e.message)
-          setAudioMode('idle')
+          const url = await speakWithElevenLabs(elevenKey, text)
+          if (audioUrl) URL.revokeObjectURL(audioUrl)
+          setAudioUrl(url)
+          setAudioMode('elevenlabs')
+          return
+        } catch (err) {
+          setAudioError(`ElevenLabs call failed, using browser voice instead. ${err.message}`)
         }
       }
-    } else {
-      try {
-        speakWithBrowser(text)
-        setAudioMode('browser')
-        setAudioError('No ElevenLabs key added yet, so this is browser voice. Add an ElevenLabs key below for the lifelike voice.')
-      } catch (err) {
-        setAudioError(err.message)
-        setAudioMode('idle')
-      }
+    }
+    try {
+      speakWithBrowser(text)
+      setAudioMode('browser')
+      setAudioError('Lifelike voice is not set up on the server yet, so this is browser voice. It still works with no key to enter.')
+    } catch (err) {
+      setAudioError(err.message)
+      setAudioMode('idle')
     }
   }
 
-  const voiceLabel = elevenKey
+  const voiceLabel = audioMode === 'elevenlabs'
     ? 'ElevenLabs voice active'
-    : 'Browser voice active (add an ElevenLabs key for the lifelike voice)'
+    : 'Browser voice active (lifelike voice is set up on the server when a key is added in Vercel)'
 
   return (
     <div className="appShell">
@@ -216,6 +224,7 @@ const App = () => {
               onChange={(e) => pickDate(e.target.value)}
             />
             <button className="btn" type="button" onClick={() => setSelectedDate(todayISO())}>Today</button>
+            <button className="btn" type="button" onClick={() => setSelectedDate(NEWEST_REAL_APOD_DATE)}>Newest real APOD</button>
             <button className="btn" type="button" onClick={() => setSelectedDate(randomAPODDate())}>Surprise me</button>
             <button className="btn" type="button" onClick={() => stepDay(-1)} aria-label="Previous day">Prev</button>
             <button className="btn" type="button" onClick={() => stepDay(1)} aria-label="Next day">Next</button>
@@ -262,6 +271,9 @@ const App = () => {
             {data.fallback && (
               <p className="panel notePanel" role="note">{data.fallbackNote} Featured image for {data.date}: {data.title}.</p>
             )}
+            {data.source && (data.source === 'apod-archive' || data.source === 'apod-website') && (
+              <p className="panel notePanel" role="note">Real APOD for {data.date}, fetched from the NASA APOD website because the APOD API is returning a placeholder right now. Newest real APOD we verified is {NEWEST_REAL_APOD_DATE}.</p>
+            )}
 
             <section className="panel" aria-label="NASA explanation">
               <h2>{data.fallback ? 'About this featured image' : 'What NASA says'}</h2>
@@ -298,8 +310,8 @@ const App = () => {
                 <ol className="quizList">
                   {geminiResult.quiz.map((q, i) => <li key={i}>{q}</li>)}
                 </ol>
-                {!geminiKey && (
-                  <p className="note">Add a Gemini key below for the AI version. Get a free key at <a href="https://aistudio.google.com/" target="_blank" rel="noreferrer">Google AI Studio</a>.</p>
+                {geminiResult.source !== 'gemini' && (
+                  <p className="note">AI explain runs through the server when a Gemini key is set once in Vercel. Get a free key at <a href="https://aistudio.google.com/" target="_blank" rel="noreferrer">Google AI Studio</a>.</p>
                 )}
               </section>
             )}
@@ -325,27 +337,25 @@ const App = () => {
               <button className="btn" type="button" onClick={loadNEO} disabled={neoLoading}>Refresh asteroids</button>
             </section>
 
-            <section className="panel" aria-label="API keys">
-              <h2>API keys (optional, stored in this browser only)</h2>
-              <p>Gemini and ElevenLabs keys are typed here, saved in localStorage, and never committed to GitHub. The app works without them, with a local explainer and browser voice.</p>
-              <p>Status: Gemini {geminiKey ? 'key saved' : 'not set'} | ElevenLabs {elevenKey ? 'key saved' : 'not set'}</p>
-              <div className="keyForm">
-                <label htmlFor="gemini-key">Gemini API key</label>
-                <input id="gemini-key" type="password" autoComplete="off" placeholder="Paste Gemini key, or leave blank" value={geminiDraft} onChange={(e) => setGeminiDraft(e.target.value)} />
-                <p className="hint">Free key: <a href="https://aistudio.google.com/" target="_blank" rel="noreferrer">Google AI Studio</a></p>
-                <label htmlFor="eleven-key">ElevenLabs API key</label>
-                <input id="eleven-key" type="password" autoComplete="off" placeholder="Paste ElevenLabs key, or leave blank" value={elevenDraft} onChange={(e) => setElevenDraft(e.target.value)} />
-                <p className="hint">Free key: <a href="https://elevenlabs.io/" target="_blank" rel="noreferrer">ElevenLabs</a> (Creator plan free for Hack The Nest hackers)</p>
-                <div className="buttonRow">
-                  <button className="btn btnPrimary" type="button" onClick={saveKeys}>Save keys in this browser</button>
-                  <button className="btn" type="button" onClick={clearKeys}>Clear keys</button>
-                  <button className="btn" type="button" onClick={() => setShowKeys(!showKeys)}>{showKeys ? 'Hide help' : 'How keys work'}</button>
+            <section className="panel" aria-label="How AI and voice work">
+              <h2>No keys to enter</h2>
+              <p>Explain and Listen work with no key to enter. They run through this app's own server routes, with keys set once in Vercel. Until those server keys are added, Explain uses a local plain English version and Listen uses browser voice, so the demo always works.</p>
+              <p className="hint">Server keys, set once in Vercel env vars, never in code: GEMINI_API_KEY, ELEVENLABS_API_KEY.</p>
+              {showKeys && (
+                <div className="keyForm">
+                  <p className="note">Advanced, only if you want to override the server with your own keys in this browser:</p>
+                  <label htmlFor="gemini-key">Gemini API key</label>
+                  <input id="gemini-key" type="password" autoComplete="off" placeholder="Paste Gemini key, or leave blank" value={geminiDraft} onChange={(e) => setGeminiDraft(e.target.value)} />
+                  <label htmlFor="eleven-key">ElevenLabs API key</label>
+                  <input id="eleven-key" type="password" autoComplete="off" placeholder="Paste ElevenLabs key, or leave blank" value={elevenDraft} onChange={(e) => setElevenDraft(e.target.value)} />
+                  <div className="buttonRow">
+                    <button className="btn btnPrimary" type="button" onClick={saveKeys}>Save keys in this browser</button>
+                    <button className="btn" type="button" onClick={clearKeys}>Clear keys</button>
+                  </div>
+                  {keySaved && <p className="note">{keySaved}</p>}
                 </div>
-                {keySaved && <p className="note">{keySaved}</p>}
-                {showKeys && (
-                  <p className="note">Keys live only in this browser localStorage. They are not in the code, not in .env, and not in the repo. Clear them before a shared demo laptop if you want.</p>
-                )}
-              </div>
+              )}
+              <button className="btn" type="button" onClick={() => setShowKeys(!showKeys)}>{showKeys ? 'Hide advanced key override' : 'Advanced: use my own keys instead'}</button>
             </section>
           </>
         )}
