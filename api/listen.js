@@ -18,9 +18,14 @@ export default async function handler(req, res) {
     return
   }
   const voice = voiceId || '21m00Tcm4TlvDq8ikWAM'
+  // Free tier fix: use the cheapest Flash model, the lowest MP3 output
+  // format, and only the first 900 characters. The previous settings
+  // (Turbo model, 44.1 kHz 128 kbps, up to 4,000 chars) were refused with
+  // 402 Payment Required on the Free plan.
+  const shortText = String(text).slice(0, 900)
   try {
     const r = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${voice}?output_format=mp3_44100_128`,
+      `https://api.elevenlabs.io/v1/text-to-speech/${voice}?output_format=mp3_22050_32`,
       {
         method: 'POST',
         headers: {
@@ -29,8 +34,8 @@ export default async function handler(req, res) {
           'xi-api-key': key,
         },
         body: JSON.stringify({
-          text: String(text).slice(0, 4000),
-          model_id: 'eleven_turbo_v2_5',
+          text: shortText,
+          model_id: 'eleven_flash_v2_5',
           voice_settings: { stability: 0.5, similarity_boost: 0.75 },
         }),
       }

@@ -34,7 +34,7 @@ export async function speakViaServer(text, voiceId = DEFAULT_VOICE_ID) {
 }
 
 export async function speakWithElevenLabs(apiKey, text, voiceId = DEFAULT_VOICE_ID) {
-  const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`
+  const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_22050_32`
   const res = await fetch(url, {
     method: 'POST',
     headers: {
@@ -43,8 +43,8 @@ export async function speakWithElevenLabs(apiKey, text, voiceId = DEFAULT_VOICE_
       'xi-api-key': apiKey,
     },
     body: JSON.stringify({
-      text: text.slice(0, 4000),
-      model_id: 'eleven_turbo_v2_5',
+      text: text.slice(0, 900),
+      model_id: 'eleven_flash_v2_5',
       voice_settings: { stability: 0.5, similarity_boost: 0.75 },
     }),
   })
