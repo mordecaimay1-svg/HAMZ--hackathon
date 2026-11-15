@@ -1,8 +1,9 @@
 // Gemini explain helper. First try the built-in server route (/api/explain),
 // which uses a key set once in Vercel, so no visitor has to enter a key.
 // Fall back to a key entered in the UI, then to the local explainer.
-const GEMINI_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
+const GEMINI_MODELS = ['gemini-2.0-flash', 'gemini-2.5-flash-lite', 'gemini-1.5-flash']
+const geminiUrl = (model) =>
+  `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
 
 export const FALLBACK_MICHIGAN =
   'From Michigan, this is a reminder to look up. Clear nights over the Great Lakes are a good time to spot planets, the Moon, and passing asteroids with just your eyes or a small telescope.'
@@ -67,17 +68,23 @@ export async function explainWithGemini(apiKey, { title, explanation, dateStr })
     '"michigan": "one short sentence about why this matters for someone watching the sky from Michigan", ' +
     '"quiz": ["question 1", "question 2", "question 3"]}. ' +
     'Make the quiz questions check understanding of the explainer.'
-  const res = await fetch(`${GEMINI_URL}?key=${encodeURIComponent(apiKey)}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.4, maxOutputTokens: 600 },
-    }),
-  })
-  if (!res.ok) {
-    const text = await res.text().catch(() => '')
-    throw new Error(`Gemini request failed (${res.status}). ${text.slice(0, 140)}`)
+  let res = null
+  let lastText = ''
+  for (const model of GEMINI_MODELS) {
+    res = await fetch(`${geminiUrl(model)}?key=${encodeURIComponent(apiKey)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.4, maxOutputTokens: 600 },
+      }),
+    })
+    if (res.ok) break
+    lastText = await res.text().catch(() => '')
+    if (!lastText.includes('no longer available') && !lastText.includes('not found')) break
+  }
+  if (!res || !res.ok) {
+    throw new Error(`Gemini request failed (${res ? res.status : 'no response'}). ${lastText.slice(0, 140)}`)
   }
   const json = await res.json()
   const text =

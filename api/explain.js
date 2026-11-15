@@ -25,21 +25,30 @@ export default async function handler(req, res) {
     '"michigan": "one short sentence about why this matters for someone watching the sky from Michigan", ' +
     '"quiz": ["question 1", "question 2", "question 3"]}. ' +
     'Make the quiz questions check understanding of the explainer.'
+  // gemini-2.5-flash is no longer available to new users, so try models
+  // in order until one answers.
+  const models = ['gemini-2.0-flash', 'gemini-2.5-flash-lite', 'gemini-1.5-flash']
+  let r = null
+  let lastError = ''
   try {
-    const r = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(key)}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.4, maxOutputTokens: 600 },
-        }),
-      }
-    )
-    if (!r.ok) {
-      const text = await r.text().catch(() => '')
-      res.status(502).json({ error: `Gemini request failed (${r.status}). ${text.slice(0, 140)}` })
+    for (const model of models) {
+      r = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.4, maxOutputTokens: 600 },
+          }),
+        }
+      )
+      if (r.ok) break
+      lastError = await r.text().catch(() => '')
+      if (!lastError.includes('no longer available') && !lastError.includes('not found')) break
+    }
+    if (!r || !r.ok) {
+      res.status(502).json({ error: `Gemini request failed (${r ? r.status : 'no response'}). ${String(lastError).slice(0, 140)}` })
       return
     }
     const json = await r.json()
