@@ -2,7 +2,7 @@
 // always works. First try the built-in server route (/api/listen), which
 // uses a key set once in Vercel, so no visitor has to enter a key.
 // Fall back to a key entered in the UI, then to browser voice.
-const DEFAULT_VOICE_ID = '21m00Tcm4TlvDq8ikWAM'
+const DEFAULT_VOICE_ID = 'mZBvqRkckauPI1J1cTxi' // Nest Narrator, owned Voice Design voice
 
 export function speakWithBrowser(text) {
   if (!('speechSynthesis' in window)) {

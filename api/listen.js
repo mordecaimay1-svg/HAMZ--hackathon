@@ -17,7 +17,10 @@ export default async function handler(req, res) {
     res.status(400).json({ error: 'text is required' })
     return
   }
-  const voice = voiceId || '21m00Tcm4TlvDq8ikWAM'
+  // Nest Narrator, a Voice Design voice this account owns. Library voices
+  // like Rachel are refused on the Free plan ("Free users cannot use
+  // library voices via the API"), so the owned voice is the default.
+  const voice = voiceId || 'mZBvqRkckauPI1J1cTxi'
   // Free tier fix: use the cheapest Flash model, the lowest MP3 output
   // format, and only the first 900 characters. The previous settings
   // (Turbo model, 44.1 kHz 128 kbps, up to 4,000 chars) were refused with
