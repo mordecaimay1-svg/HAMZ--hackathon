@@ -28,6 +28,12 @@ export async function fetchAPOD(dateStr) {
       localStorage.setItem(cacheKey, JSON.stringify(fallback))
       return { data: fallback, fromCache: true }
     }
+    const cachedUrl = parsed.url || parsed.hdurl || ''
+    if (parsed.fallback && (cachedUrl.includes('~large') || cachedUrl.includes('~medium'))) {
+      const fallback = fallbackForDate(dateStr)
+      localStorage.setItem(cacheKey, JSON.stringify(fallback))
+      return { data: fallback, fromCache: true }
+    }
     return { data: parsed, fromCache: true }
   }
   const url = `${NASA_BASE}/planetary/apod?api_key=${NASA_KEY}&date=${dateStr}`
