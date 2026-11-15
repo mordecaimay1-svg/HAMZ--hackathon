@@ -25,9 +25,25 @@ export default async function handler(req, res) {
     '"michigan": "one short sentence about why this matters for someone watching the sky from Michigan", ' +
     '"quiz": ["question 1", "question 2", "question 3"]}. ' +
     'Make the quiz questions check understanding of the explainer.'
-  // gemini-2.5-flash is no longer available to new users, so try models
-  // in order until one answers.
-  const models = ['gemini-2.0-flash', 'gemini-2.5-flash-lite', 'gemini-1.5-flash']
+  // Model names change and new keys do not get every model, so list the
+  // models this key can actually use, then try them in order.
+  let models = ['gemini-2.0-flash', 'gemini-2.5-flash-lite', 'gemini-1.5-flash']
+  try {
+    const listR = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}&pageSize=100`
+    )
+    if (listR.ok) {
+      const listJ = await listR.json()
+      const usable = (listJ.models || [])
+        .filter((m) => (m.supportedGenerationMethods || []).includes('generateContent'))
+        .map((m) => String(m.name || '').replace('models/', ''))
+        .filter(Boolean)
+      const preferred = ['gemini-2.0-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash-lite']
+      const ordered = preferred.filter((p) => usable.includes(p))
+      const rest = usable.filter((u) => !preferred.includes(u))
+      if (ordered.length || rest.length) models = [...ordered, ...rest]
+    }
+  } catch (e) {}
   let r = null
   let lastError = ''
   try {
