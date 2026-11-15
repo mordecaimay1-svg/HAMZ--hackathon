@@ -1,7 +1,16 @@
 // Gemini explain helper. First try the built-in server route (/api/explain),
 // which uses a key set once in Vercel, so no visitor has to enter a key.
 // Fall back to a key entered in the UI, then to the local explainer.
-const GEMINI_MODELS = ['gemini-2.0-flash', 'gemini-2.5-flash-lite', 'gemini-1.5-flash']
+// Current text models for a new Gemini key. 2.5 / 1.5 / 2.0 are limited to
+// projects that used them before, and generateContent 404s for new keys.
+// Docs: ai.google.dev/gemini-api/docs/models
+const GEMINI_MODELS = [
+  'gemini-3.5-flash-lite',
+  'gemini-3.8-flash',
+  'gemini-3.6-flash',
+  'gemini-3.1-flash-lite',
+  'gemini-flash-latest',
+]
 const geminiUrl = (model) =>
   `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
 
@@ -81,7 +90,7 @@ export async function explainWithGemini(apiKey, { title, explanation, dateStr })
     })
     if (res.ok) break
     lastText = await res.text().catch(() => '')
-    if (!lastText.includes('no longer available') && !lastText.includes('not found')) break
+    if (res.status === 401 || res.status === 403) break
   }
   if (!res || !res.ok) {
     throw new Error(`Gemini request failed (${res ? res.status : 'no response'}). ${lastText.slice(0, 140)}`)
