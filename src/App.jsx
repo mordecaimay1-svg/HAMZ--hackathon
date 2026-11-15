@@ -11,7 +11,7 @@ const GEMINI_KEY_STORE = 'nest-gemini-key'
 const ELEVEN_KEY_STORE = 'nest-elevenlabs-key'
 
 const App = () => {
-  const [selectedDate, setSelectedDate] = useState(todayISO())
+  const [selectedDate, setSelectedDate] = useState(NEWEST_REAL_APOD_DATE)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [apodError, setApodError] = useState('')
@@ -253,7 +253,7 @@ const App = () => {
           <section className="panel errorPanel" role="alert">
             <h2>Could not load that date</h2>
             <p>{apodError}</p>
-            <p>Check the date, then try Today. NASA DEMO_KEY has a low rate limit, so a free NASA key helps.</p>
+            <p>Check the date, then try the Newest real APOD button.</p>
             <button className="btn btnPrimary" type="button" onClick={() => loadAPOD(selectedDate)}>Try again</button>
           </section>
         )}
@@ -272,7 +272,7 @@ const App = () => {
               <p className="panel notePanel" role="note">{data.fallbackNote} Featured image for {data.date}: {data.title}.</p>
             )}
             {data.source && (data.source === 'apod-archive' || data.source === 'apod-website') && (
-              <p className="panel notePanel" role="note">Real APOD for {data.date}, fetched from the NASA APOD website because the APOD API is returning a placeholder right now. Newest real APOD we verified is {NEWEST_REAL_APOD_DATE}.</p>
+              <p className="panel notePanel" role="note">Real APOD for {data.date}, from the NASA APOD website.</p>
             )}
 
             <section className="panel" aria-label="NASA explanation">

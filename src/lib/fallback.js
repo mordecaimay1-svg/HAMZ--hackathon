@@ -76,7 +76,7 @@ export function fallbackForDate(dateStr) {
     media_type: 'image',
     copyright: pick.copyright,
     fallback: true,
-    fallbackNote: 'NASA APOD API is returning a placeholder image right now, so this is a featured NASA image from the NASA Image Library instead.',
+    fallbackNote: 'Featured NASA image from the NASA Image Library.',
   }
 }
 
