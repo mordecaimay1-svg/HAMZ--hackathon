@@ -1,5 +1,6 @@
 // NASA API helpers. No keys are stored here. The NASA key comes from
 // VITE_NASA_API_KEY at build time and defaults to DEMO_KEY.
+import { fallbackForDate, isPlaceholderAPOD } from './fallback'
 const NASA_KEY = import.meta.env.VITE_NASA_API_KEY || 'DEMO_KEY'
 const NASA_BASE = 'https://api.nasa.gov'
 
@@ -21,7 +22,13 @@ export async function fetchAPOD(dateStr) {
   const cacheKey = `NASA-APOD-${dateStr}`
   const cached = localStorage.getItem(cacheKey)
   if (cached) {
-    return { data: JSON.parse(cached), fromCache: true }
+    const parsed = JSON.parse(cached)
+    if (isPlaceholderAPOD(parsed)) {
+      const fallback = fallbackForDate(dateStr)
+      localStorage.setItem(cacheKey, JSON.stringify(fallback))
+      return { data: fallback, fromCache: true }
+    }
+    return { data: parsed, fromCache: true }
   }
   const url = `${NASA_BASE}/planetary/apod?api_key=${NASA_KEY}&date=${dateStr}`
   const res = await fetch(url)
@@ -32,6 +39,11 @@ export async function fetchAPOD(dateStr) {
   const data = await res.json()
   if (data.code || data.error) {
     throw new Error(data.msg || data.error?.message || 'NASA APOD returned an error.')
+  }
+  if (isPlaceholderAPOD(data)) {
+    const fallback = fallbackForDate(dateStr)
+    localStorage.setItem(cacheKey, JSON.stringify(fallback))
+    return { data: fallback, fromCache: false }
   }
   localStorage.setItem(cacheKey, JSON.stringify(data))
   return { data, fromCache: false }

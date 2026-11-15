@@ -259,10 +259,14 @@ const App = () => {
               </div>
             </div>
 
+            {data.fallback && (
+              <p className="panel notePanel" role="note">{data.fallbackNote} Featured image for {data.date}: {data.title}.</p>
+            )}
+
             <section className="panel" aria-label="NASA explanation">
-              <h2>What NASA says</h2>
+              <h2>{data.fallback ? 'About this featured image' : 'What NASA says'}</h2>
               <p>{data.explanation}</p>
-              <p className="sourceLine">Source: NASA Astronomy Picture of the Day, {data.date}. Data shown exactly as NASA published it.</p>
+              <p className="sourceLine">Source: {data.fallback ? 'NASA Image Library' : `NASA Astronomy Picture of the Day, ${data.date}`}. Data shown exactly as NASA published it.</p>
               <div className="buttonRow">
                 <button className="btn btnPrimary" type="button" onClick={handleExplain} disabled={geminiLoading}>
                   {geminiLoading ? 'Explaining...' : 'Explain this in plain English'}
